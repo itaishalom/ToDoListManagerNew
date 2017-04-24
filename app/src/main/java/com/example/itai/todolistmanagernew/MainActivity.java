@@ -2,10 +2,13 @@ package com.example.itai.todolistmanagernew;
 
 import android.app.AlertDialog;
 
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.res.Configuration;
 
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
@@ -27,16 +30,25 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.RelativeLayout.LayoutParams;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.Calendar;
+
+import static com.example.itai.todolistmanagernew.DBHandler.TASK_COLUMN;
+import static com.example.itai.todolistmanagernew.DBHandler.TODO_TABLE;
+import static com.example.itai.todolistmanagernew.ToDoContentProvider.PROVIDER;
 
 public class MainActivity extends AppCompatActivity {
     ListView lv1;
     EditText inputSearch;
     ArrayList<String> toDos;
+    ArrayList<JSONObject> toDosJsons;
     ColorsListAdapter  adapter;
     int mCurrentDeleteToDo=0;
-
+    public static DBHandler mDBhandler;
     int mYear;
     int mMount;
     int mDay;
@@ -44,20 +56,31 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        lv1 = (ListView) findViewById(R.id.listView1);
+        if(mDBhandler==null) {
+            mDBhandler = new DBHandler(getApplicationContext());
+        }
+        if (toDos == null) {
+            toDos = new ArrayList<>();
+            toDosJsons = new ArrayList<>();
+            loadOnStart();
+        }
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        lv1 = (ListView) findViewById(R.id.listView1);
+
         inputSearch = (EditText) findViewById(R.id.editText);
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 if(toDos==null){
-                    toDos= new ArrayList<String>();
+                    toDos= new ArrayList<>();
                 }
                 AlertDialog.Builder alert = new AlertDialog.Builder(MainActivity.this);
                 final EditText memo = new EditText(MainActivity.this);
                 DatePicker dpd = new DatePicker(getApplicationContext());
+                mYear = 2017;
+                mDay=mMount=1;
                 dpd.init(2017,1,1,  new DatePicker.OnDateChangedListener() {
 
                     public void onDateChanged(DatePicker view, int yy, int mm, int dd) {
@@ -83,10 +106,26 @@ public class MainActivity extends AppCompatActivity {
 
                 alert.setPositiveButton("Confirm", new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
-                        String date = mDay +"."+mMount+"."+mYear;
-                        toDos.add(date+" : "+memo.getText().toString());
-                        adapter = new ColorsListAdapter(getApplicationContext(),  R.layout.simplerow, toDos);
-                        lv1.setAdapter(adapter);
+                        try {
+                            JSONObject todoJS = new JSONObject();
+                            ContentValues cv = new ContentValues();
+                            String date = mDay +"."+mMount+"."+mYear;
+
+                            todoJS.put("Date",date);
+                            String theMemo = date + " " + memo.getText().toString();
+                            todoJS.put(TASK_COLUMN,theMemo);
+                            String ID = String.valueOf(System.currentTimeMillis());
+                            todoJS.put("_id", ID);
+                            toDosJsons.add(todoJS);
+                            toDos.add(theMemo);
+                            cv.put("_id",ID);
+                            cv.put(TASK_COLUMN,theMemo);
+                            getContentResolver().insert(Uri.parse("content://" + PROVIDER + "/" + TODO_TABLE),cv);
+                            adapter = new ColorsListAdapter(getApplicationContext(),  R.layout.simplerow, toDos);
+                            lv1.setAdapter(adapter);
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
                     }
                 });
 
@@ -118,8 +157,12 @@ public class MainActivity extends AppCompatActivity {
                         new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int id) {
                                 toDos.remove(mCurrentDeleteToDo);
+                                JSONObject toRemoveJs = toDosJsons.remove(mCurrentDeleteToDo);
+                                int deleteNumber = getContentResolver().delete(Uri.parse("content://" + PROVIDER + "/" + TODO_TABLE +"/"+toRemoveJs.optString("_id")),null,null);
                                 adapter = new ColorsListAdapter(getApplicationContext(),  R.layout.simplerow,toDos);
                                 lv1.setAdapter(adapter);
+                                if(deleteNumber > 0)
+                                    Toast.makeText(getBaseContext(), "Delete was successful", Toast.LENGTH_SHORT).show();
 
                             }
                         });
@@ -179,4 +222,35 @@ public class MainActivity extends AppCompatActivity {
         super.onConfigurationChanged(newConfig);
     }
 
+    private void loadOnStart()
+    {
+        String table = TODO_TABLE;
+        Cursor loadStartCursor = getContentResolver().query(Uri.parse("content://" + PROVIDER + "/" +table),null,null,null,null);
+        if(loadStartCursor.moveToFirst()){
+            do{
+                JSONObject jsonObject = new JSONObject();
+                try {
+                    String id = loadStartCursor.getString(loadStartCursor.getColumnIndex("_id"));
+                    String theMemo = loadStartCursor.getString(loadStartCursor.getColumnIndex(TASK_COLUMN));
+                    jsonObject.put("_id",id);
+                    jsonObject.put(TASK_COLUMN,theMemo );
+                    toDosJsons.add(jsonObject);
+                    toDos.add(theMemo);
+                    adapter = new ColorsListAdapter(getApplicationContext(),  R.layout.simplerow, toDos);
+                    lv1.setAdapter(adapter);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }while(loadStartCursor.moveToNext());
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if(toDos != null) {
+            adapter = new ColorsListAdapter(getApplicationContext(), R.layout.simplerow, toDos);
+            lv1.setAdapter(adapter);
+        }
+    }
 }
