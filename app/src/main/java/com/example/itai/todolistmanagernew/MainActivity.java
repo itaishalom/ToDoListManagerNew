@@ -44,7 +44,7 @@ import static com.example.itai.todolistmanagernew.ToDoContentProvider.PROVIDER;
 public class MainActivity extends AppCompatActivity {
     ListView lv1;
     EditText inputSearch;
-    ArrayList<String> toDos;
+
     ArrayList<JSONObject> toDosJsons;
     ColorsListAdapter  adapter;
     int mCurrentDeleteToDo=0;
@@ -60,9 +60,9 @@ public class MainActivity extends AppCompatActivity {
         if(mDBhandler==null) {
             mDBhandler = new DBHandler(getApplicationContext());
         }
-        if (toDos == null) {
-            toDos = new ArrayList<>();
+        if (toDosJsons == null) {
             toDosJsons = new ArrayList<>();
+
             loadOnStart();
         }
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -73,8 +73,8 @@ public class MainActivity extends AppCompatActivity {
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(toDos==null){
-                    toDos= new ArrayList<>();
+                if(toDosJsons==null){
+                    toDosJsons= new ArrayList<>();
                 }
                 AlertDialog.Builder alert = new AlertDialog.Builder(MainActivity.this);
                 final EditText memo = new EditText(MainActivity.this);
@@ -117,11 +117,11 @@ public class MainActivity extends AppCompatActivity {
                             String ID = String.valueOf(System.currentTimeMillis());
                             todoJS.put("_id", ID);
                             toDosJsons.add(todoJS);
-                            toDos.add(theMemo);
+
                             cv.put("_id",ID);
                             cv.put(TASK_COLUMN,theMemo);
                             getContentResolver().insert(Uri.parse("content://" + PROVIDER + "/" + TODO_TABLE),cv);
-                            adapter = new ColorsListAdapter(getApplicationContext(),  R.layout.simplerow, toDos);
+                            adapter = new ColorsListAdapter(getApplicationContext(),  R.layout.simplerow, toDosJsons);
                             lv1.setAdapter(adapter);
                         } catch (JSONException e) {
                             e.printStackTrace();
@@ -156,10 +156,10 @@ public class MainActivity extends AppCompatActivity {
                         "Yes",
                         new DialogInterface.OnClickListener() {
                             public void onClick(DialogInterface dialog, int id) {
-                                toDos.remove(mCurrentDeleteToDo);
+
                                 JSONObject toRemoveJs = toDosJsons.remove(mCurrentDeleteToDo);
                                 int deleteNumber = getContentResolver().delete(Uri.parse("content://" + PROVIDER + "/" + TODO_TABLE +"/"+toRemoveJs.optString("_id")),null,null);
-                                adapter = new ColorsListAdapter(getApplicationContext(),  R.layout.simplerow,toDos);
+                                adapter = new ColorsListAdapter(getApplicationContext(),  R.layout.simplerow,toDosJsons);
                                 lv1.setAdapter(adapter);
                                 if(deleteNumber > 0)
                                     Toast.makeText(getBaseContext(), "Delete was successful", Toast.LENGTH_SHORT).show();
@@ -235,8 +235,7 @@ public class MainActivity extends AppCompatActivity {
                     jsonObject.put("_id",id);
                     jsonObject.put(TASK_COLUMN,theMemo );
                     toDosJsons.add(jsonObject);
-                    toDos.add(theMemo);
-                    adapter = new ColorsListAdapter(getApplicationContext(),  R.layout.simplerow, toDos);
+                    adapter = new ColorsListAdapter(getApplicationContext(),  R.layout.simplerow, toDosJsons);
                     lv1.setAdapter(adapter);
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -248,8 +247,8 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if(toDos != null) {
-            adapter = new ColorsListAdapter(getApplicationContext(), R.layout.simplerow, toDos);
+        if(toDosJsons != null) {
+            adapter = new ColorsListAdapter(getApplicationContext(), R.layout.simplerow, toDosJsons);
             lv1.setAdapter(adapter);
         }
     }
